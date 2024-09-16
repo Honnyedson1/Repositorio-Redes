@@ -1,0 +1,162 @@
+using System;
+using System.Net.Sockets;
+using System.Text;
+
+class JogoDaVelhaCliente
+{
+    static void Main(string[] args)
+    {
+        TcpClient cliente = null;
+        NetworkStream stream = null;
+        string servidor = "127.0.0.1";
+        int porta = 13000;
+        string msgInicial = string.Empty;
+        string simboloJogador = "O";
+        string resposta = string.Empty;
+        bool jogoIniciado = false;
+        bool jogoEncerrado = false;
+        int bytesLidos = 0;
+        bool ignorar = false;
+        bool controle = false;
+
+        try
+        {
+            cliente = new TcpClient(servidor, porta); // Conectando ao servidor local
+            stream = cliente.GetStream();
+
+            Console.WriteLine("Conectado ao servidor do Jogo da Velha!");
+
+            byte[] buffer = new byte[512];
+
+            while (!jogoIniciado)
+            {
+                // Ler resposta inicial do servidor (esperando outro jogador ou início do jogo)
+                bytesLidos = stream.Read(buffer, 0, buffer.Length);
+                msgInicial = Encoding.UTF8.GetString(buffer, 0, bytesLidos).Trim();
+
+                if (msgInicial == "1" && !ignorar)
+                {
+                    Console.WriteLine("Aguardando outro jogador...");
+                    simboloJogador = "X";
+                    ignorar = true;
+                }
+                else if (msgInicial == "0")
+                {
+                    Console.WriteLine("Iniciando Partida...");
+                    jogoIniciado = true;
+                }
+            }
+
+            // Recebe mensagem do Servidor
+            bytesLidos = stream.Read(buffer, 0, buffer.Length);
+            resposta = Encoding.UTF8.GetString(buffer, 0, bytesLidos);
+
+            // Exibe o jogo da velha
+            Console.WriteLine(resposta);
+            ExibirJogo(resposta);
+
+            if (simboloJogador == "O")
+            {
+                controle = true;
+            }
+
+            // Loop do jogo
+            while (!jogoEncerrado)
+            {
+                if (controle)
+                {
+                    Console.WriteLine("Aguarde a jogada do oponente...");
+                }
+
+                // Recebe mensagem do Servidor
+                bytesLidos = stream.Read(buffer, 0, buffer.Length);
+                resposta = Encoding.UTF8.GetString(buffer, 0, bytesLidos);
+
+                if (resposta.Length == 1)
+                {
+                    while (true)
+                    {
+                        // Pede para o usuário digitar a jogada
+                        Console.WriteLine("Sua vez! Digite sua jogada (1-9):");
+
+                        // Envia a jogada para o Servidor
+                        string jogada = Console.ReadLine();
+                        byte[] msg = Encoding.UTF8.GetBytes(jogada);
+                        stream.Write(msg, 0, msg.Length);
+
+                        // Receber a confirmação da jogada
+                        bytesLidos = stream.Read(buffer, 0, buffer.Length);
+                        resposta = Encoding.UTF8.GetString(buffer, 0, bytesLidos).Trim();
+
+                        if (resposta == "-1")
+                        {
+                            Console.WriteLine("Jogada inválida, tente novamente.");
+                        }
+                        else
+                        {
+                            Console.WriteLine("Jogada registrada com sucesso!");
+                            // Recebe jogo da velha atualizado do Servidor
+                            bytesLidos = stream.Read(buffer, 0, buffer.Length);
+                            resposta = Encoding.UTF8.GetString(buffer, 0, bytesLidos);
+                            break;
+                        }
+                    }
+                }
+
+                // Exibe o jogo da velha
+                ExibirJogo(resposta);
+
+                if (resposta.Length == 10)
+                {
+                    // Verificar se houve vitória ou empate
+                    char resultadoJogo = resposta[9];
+                    if (resultadoJogo == '1' || resultadoJogo == '2')
+                    {
+                        // Exibe mensagem de vitória/derrota para ambos os jogadores
+                        if ((resultadoJogo == '1' && simboloJogador == "X") || (resultadoJogo == '2' && simboloJogador == "O"))
+                        {
+                            Console.WriteLine($"Parabens Pela Vitoria: {simboloJogador}");
+                        }
+                        else
+                        {
+                            // Mensagem de derrota
+                            Console.WriteLine("o oponente venceu te derrotou");
+                        }
+                        jogoEncerrado = true;
+                    }
+                    else if (resultadoJogo == '3')
+                    {
+                        Console.WriteLine("Deu Velha! Empate");
+                        jogoEncerrado = true;
+                    }
+                }
+
+                // Al
+                controle = !controle;
+            }
+        }
+        catch (SocketException e)
+        {
+            Console.WriteLine("Erro de Conexão: {0}", e);
+        }
+        finally
+        {
+            stream?.Close();
+            cliente?.Close();
+        }
+
+        Console.WriteLine("Conexão encerrada.");
+    }
+
+    static void ExibirJogo(string tabuleiro)
+    {
+        Console.WriteLine("");
+        Console.WriteLine("Jogo da Velha Atual:");
+        Console.WriteLine($"{tabuleiro[0]} | {tabuleiro[1]} | {tabuleiro[2]}");
+        Console.WriteLine("--+---+--");
+        Console.WriteLine($"{tabuleiro[3]} | {tabuleiro[4]} | {tabuleiro[5]}");
+        Console.WriteLine("--+---+--");
+        Console.WriteLine($"{tabuleiro[6]} | {tabuleiro[7]} | {tabuleiro[8]}");
+        Console.WriteLine(""); 
+    }
+}
